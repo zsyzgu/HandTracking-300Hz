@@ -4,17 +4,21 @@ import cv2
 import time
 import _thread
 
-def illustration(images):
+def illustration(images, output_stream,is_running):
     cnt = 0
     while True:
-        if cnt + 20 <= len(images):
+        if cnt < len(images):
+            output_stream.write(images[cnt])
+            cnt += 1
+        else:
+            time.sleep(0.001)
+        if cnt % 20 == 1:
             cv2.imshow('RealSense', images[-1])
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
+                is_running[0] = False
                 break
-            cnt = len(images)
-        time.sleep(0.005)
 
 if __name__ == "__main__":
     pipeline = rs.pipeline()
@@ -27,25 +31,23 @@ if __name__ == "__main__":
     depth_sensor.set_option(rs.option.laser_power, 0)
 
     images = []
-    _thread.start_new_thread(illustration, (images,))
+    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+    output_stream = cv2.VideoWriter('video.avi', fourcc, 10, (848, 200), 0)
+    is_running = [True]
+    _thread.start_new_thread(illustration, (images, output_stream, is_running))
 
     t = time.time()
-    for i in range(2000):
+    last_time_gap = 0
+    while is_running[0]:
+        time_start = time.time_ns()
         frames = pipeline.wait_for_frames()
-        frame0 = frames.get_infrared_frame(1)
-        frame1 = frames.get_infrared_frame(2)
-
-        if frame0 and frame1:
+        time_gap = time.time_ns() - time_start
+        if time_gap < last_time_gap: # waiting for sync
+            frame0 = frames.get_infrared_frame(1)
+            frame1 = frames.get_infrared_frame(2)
             image = np.vstack([np.asanyarray(frame0.get_data()), np.asanyarray(frame1.get_data())])
             images.append(image.copy())
+        last_time_gap = time_gap
     
-    print(time.time() - t, len(images))
-
-    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-    out = cv2.VideoWriter('video.avi', fourcc, 10, (848, 200), 0)
-
-    for i in range(len(images)):
-        image = images[i]
-        out.write(image)
-
-    out.release()
+    print('Time = %.3f, FPS = %.1f' % (time.time() - t, len(images) / (time.time() - t)))
+    output_stream.release()
