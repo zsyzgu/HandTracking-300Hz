@@ -9,6 +9,8 @@ def illustration(images, output_stream,is_running):
     while True:
         if cnt < len(images):
             output_stream.write(images[cnt])
+            if cnt > 0:
+                images[cnt-1] = None
             cnt += 1
         else:
             time.sleep(0.001)
@@ -32,7 +34,7 @@ if __name__ == "__main__":
 
     images = []
     fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-    output_stream = cv2.VideoWriter('video.avi', fourcc, 10, (848, 200), 0)
+    output_stream = cv2.VideoWriter('video.avi', fourcc, 30, (848, 200), 0)
     is_running = [True]
     _thread.start_new_thread(illustration, (images, output_stream, is_running))
 
