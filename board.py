@@ -1,99 +1,74 @@
-import sys
-import cv2
-import time
 import numpy as np
-import pickle
-import keyboard
+import sys
+import time
+import cv2
+import _thread
 sys.path.append('./sensel-lib-wrappers/sensel-lib-python')
 import sensel
-from frame_data import FrameData
-from frame_data import ContactData
-import _thread
 
 class Board():
-    MAX_X = 230.0
-    MAX_Y = 130.0
-    FPS = 50
+    R = 105
+    C = 185
 
     def __init__(self):
-        self._openSensel()
-        self._initFrame()
-
-    def stop(self):
-        self.is_running = False
-
-    def _openSensel(self):
-        handle = None
         (error, device_list) = sensel.getDeviceList()
         if device_list.num_devices != 0:
             (error, handle) = sensel.openDeviceByID(device_list.devices[0].idx)
         self.handle = handle
-
-    def _initFrame(self):
         (error, self.info) = sensel.getSensorInfo(self.handle)
-        error = sensel.setFrameContent(self.handle, 0x0F)
-        error = sensel.setContactsMask(self.handle, 0x0F)
+        error = sensel.setFrameContent(self.handle, 0x05)
+        error = sensel.setContactsMask(self.handle, 0x01)
         (error, frame) = sensel.allocateFrameData(self.handle)
         error = sensel.startScanning(self.handle)
         self._frame = frame
-        self.frames = []
-        self.updated = False
-        try:
-            _thread.start_new_thread(self._run, ())
-        except:
-            print("Thread Error")
+        self.force_arrays = []
+        fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+        self.output_stream = cv2.VideoWriter('video.avi', fourcc, 125, (self.C, self.R), 0)
 
     def _closeSensel(self):
-        self.is_running = False
         error = sensel.freeFrameData(self.handle, self._frame)
         error = sensel.stopScanning(self.handle)
         error = sensel.close(self.handle)
     
-    def _sync(self):
-        if len(self.frames) > 0:
-            while ((time.perf_counter() - self.frames[-1].timestamp) * Board.FPS < 1):
-                pass
+    def illustration(self):
+        cnt = 0
+        while self.is_running:
+            if cnt < len(self.force_arrays):
+                self.output_stream.write(self.force_arrays[cnt])
+                if cnt > 0:
+                    self.force_arrays[cnt-1] = None
+                cnt += 1
+            else:
+                time.sleep(0.001)
+            
+            if cnt % 4 == 1:
+                cv2.imshow('ForceArray', self.force_arrays[-1])
+                key = cv2.waitKey(1)
+                if key & 0xFF == ord('q'):
+                    cv2.destroyAllWindows()
+                    self.is_running = False
+                    break
 
-    def _run(self):
+    def run(self):
         self.is_running = True
+        _thread.start_new_thread(self.illustration, ())
+
         while (self.is_running):
             error = sensel.readSensor(self.handle)
             (error, num_frames) = sensel.getNumAvailableFrames(self.handle)
             for i in range(num_frames):
-                self._sync()
-                timestamp = time.perf_counter()
                 error = sensel.getFrame(self.handle, self._frame)
-            R = self.info.num_rows
-            C = self.info.num_cols
-            force_array = np.zeros((R, C))
-            for r in range(R):
-                force_array[r, :] = self._frame.force_array[r * C : (r + 1) * C]
-            force_array *= 0.2
-            frame = FrameData(force_array, timestamp)
+            f = self._frame.force_array[:self.R*self.C]
+            force_array = np.reshape(f, (self.R, self.C))
+            self.force_arrays.append(force_array)
 
             for i in range(self._frame.n_contacts):
                 c = self._frame.contacts[i]
-                x = c.x_pos / Board.MAX_X
-                y = c.y_pos / Board.MAX_Y
-                contact = ContactData(c.id, c.state, x, y, c.area, c.total_force, c.major_axis, c.minor_axis, c.delta_x, c.delta_y, c.delta_force, c.delta_area)
-                frame.append_contact(contact)
-            self.frames.append(frame)
-            self.updated = True
+                #print(c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis)
         
         self._closeSensel()
+        self.output_stream.release()
 
-    def getFrame(self):
-        while (len(self.frames) == 0):
-            time.sleep(0.001)
-        return self.frames[-1]
-    
-    def getNewFrame(self):
-        while self.updated == False:
-            time.sleep(0.001)
-        self.updated = False
-        return self.frames[-1]
-    
-    def getFrameTime(self):
-        if len(self.frames) >= 2:
-            return round(self.frames[-1].timestamp - self.frames[-2].timestamp, 5)
-        return 0
+if __name__ == "__main__":
+    board = Board()
+    board.run()
