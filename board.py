@@ -3,7 +3,6 @@ import sys
 import time
 import cv2
 import _thread
-sys.path.append('./sensel-lib-wrappers/sensel-lib-python')
 import sensel
 
 class Board():
