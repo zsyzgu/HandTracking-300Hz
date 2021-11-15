@@ -53,17 +53,21 @@ class Board():
         _thread.start_new_thread(self.illustration, ())
 
         while (self.is_running):
+            t = time.perf_counter()
+
             error = sensel.readSensor(self.handle)
             (error, num_frames) = sensel.getNumAvailableFrames(self.handle)
             for i in range(num_frames):
                 error = sensel.getFrame(self.handle, self._frame)
-            f = self._frame.force_array[:self.R*self.C]
-            force_array = np.reshape(f, (self.R, self.C))
+            force_array = self._frame.force_array[:self.R*self.C]
+            force_array = np.clip((np.reshape(force_array, (self.R, self.C)) * 10),0,255).astype(np.uint8)
             self.force_arrays.append(force_array)
 
             for i in range(self._frame.n_contacts):
                 c = self._frame.contacts[i]
                 #print(c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis)
+            
+            print(time.perf_counter() - t)
         
         self._closeSensel()
         self.output_stream.release()
