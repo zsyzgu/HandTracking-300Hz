@@ -3,9 +3,11 @@ import numpy as np
 import cv2
 import time
 import _thread
+import pickle
 
 class Camera():
-    def __init__(self):
+    def __init__(self, save_path):
+        self.save_path = save_path
         self.pipeline = rs.pipeline()
         config = rs.config()
         config.enable_stream(rs.stream.infrared, 1, 848, 100, rs.format.y8, 300)
@@ -17,15 +19,16 @@ class Camera():
 
         self.images = []
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-        self.output_stream = cv2.VideoWriter('video.avi', fourcc, 30, (848, 200), 0)
+        self.output_stream = cv2.VideoWriter(save_path + 'camera.avi', fourcc, 30, (848, 200), 0)
+        self.timestamps = []
 
-    def illustration(self):
+    def _illustration(self):
         cnt = 0
         while self.is_running:
             if cnt < len(self.images):
                 self.output_stream.write(self.images[cnt])
                 if cnt > 0:
-                    self.images[cnt-1] = None
+                    self.images[cnt-1] = None # release memory
                 cnt += 1
             else:
                 time.sleep(0.001)
@@ -36,27 +39,36 @@ class Camera():
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
                     self.is_running = False
+        
+        while cnt < len(self.images):
+            self.output_stream.write(self.images[cnt])
+            cnt += 1
+        
+    def _save_data(self):
+        self.output_stream.release()
+        pickle.dump(self.timestamps, open(self.save_path + 'camera_timestamps.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
-        _thread.start_new_thread(self.illustration, ())
+        _thread.start_new_thread(self._illustration, ())
 
-        start_time = time.time()
+        start_time = time.perf_counter()
         last_time_gap = 0
         while self.is_running:
             t = time.perf_counter()
             frames = self.pipeline.wait_for_frames()
             time_gap = time.perf_counter() - t
             if time_gap < last_time_gap: # waiting for sync
+                self.timestamps.append(time.perf_counter())
                 frame0 = frames.get_infrared_frame(1)
                 frame1 = frames.get_infrared_frame(2)
                 image = np.vstack([np.asanyarray(frame0.get_data()), np.asanyarray(frame1.get_data())])
                 self.images.append(image.copy())
             last_time_gap = time_gap
         
-        print('Time = %.3f, FPS = %.1f' % (time.time() - start_time, len(self.images) / (time.time() - start_time)))
-        self.output_stream.release()
+        print('Time = %.3f, FPS = %.1f' % (time.perf_counter() - start_time, len(self.images) / (time.perf_counter() - start_time)))
+        self._save_data()
 
 if __name__ == "__main__":
-    camera = Camera()
+    camera = Camera('data/')
     camera.run()

@@ -1,5 +1,5 @@
+import pickle
 import numpy as np
-import sys
 import time
 import cv2
 import _thread
@@ -9,7 +9,8 @@ class Board():
     R = 105
     C = 185
 
-    def __init__(self):
+    def __init__(self, save_path):
+        self.save_path = save_path
         (error, device_list) = sensel.getDeviceList()
         if device_list.num_devices != 0:
             (error, handle) = sensel.openDeviceByID(device_list.devices[0].idx)
@@ -22,20 +23,22 @@ class Board():
         self._frame = frame
         self.force_arrays = []
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-        self.output_stream = cv2.VideoWriter('video.avi', fourcc, 125, (self.C, self.R), 0)
+        self.output_stream = cv2.VideoWriter(save_path + 'board.avi', fourcc, 125, (self.C, self.R), 0)
+        self.timestamps = []
+        self.contacts = []
 
     def _closeSensel(self):
         error = sensel.freeFrameData(self.handle, self._frame)
         error = sensel.stopScanning(self.handle)
         error = sensel.close(self.handle)
     
-    def illustration(self):
+    def _illustration(self):
         cnt = 0
         while self.is_running:
             if cnt < len(self.force_arrays):
                 self.output_stream.write(self.force_arrays[cnt])
                 if cnt > 0:
-                    self.force_arrays[cnt-1] = None
+                    self.force_arrays[cnt-1] = None # release memory
                 cnt += 1
             else:
                 time.sleep(0.001)
@@ -47,10 +50,19 @@ class Board():
                     cv2.destroyAllWindows()
                     self.is_running = False
                     break
+        
+        while cnt < len(self.force_arrays):
+            self.output_stream.write(self.force_arrays[cnt])
+            cnt += 1
+
+    def _save_data(self):
+        self.output_stream.release()
+        pickle.dump(self.timestamps, open(self.save_path + 'board_timestamps.pickle', 'wb'))
+        pickle.dump(self.contacts, open(self.save_path + 'board_contacts.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
-        _thread.start_new_thread(self.illustration, ())
+        _thread.start_new_thread(self._illustration, ())
 
         while (self.is_running):
             t = time.perf_counter()
@@ -59,19 +71,22 @@ class Board():
             (error, num_frames) = sensel.getNumAvailableFrames(self.handle)
             for i in range(num_frames):
                 error = sensel.getFrame(self.handle, self._frame)
+            self.timestamps.append(time.perf_counter())
             force_array = self._frame.force_array[:self.R*self.C]
             force_array = np.clip((np.reshape(force_array, (self.R, self.C)) * 10),0,255).astype(np.uint8)
             self.force_arrays.append(force_array)
 
+            frame_contacts = []
             for i in range(self._frame.n_contacts):
                 c = self._frame.contacts[i]
-                #print(c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis)
+                frame_contacts.append([c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis])
+            self.contacts.append(frame_contacts)
             
             print(time.perf_counter() - t)
         
         self._closeSensel()
-        self.output_stream.release()
+        self._save_data()
 
 if __name__ == "__main__":
-    board = Board()
+    board = Board('data/')
     board.run()
