@@ -28,7 +28,7 @@ def main(load_path):
 
     # ===== Illustration =====
 
-    speed = 0.1
+    speed = 0.5
     FPS = 100
     t = 0
     board_cnt = 0

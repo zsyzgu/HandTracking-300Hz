@@ -18,12 +18,14 @@ class Board():
         (error, self.info) = sensel.getSensorInfo(self.handle)
         error = sensel.setFrameContent(self.handle, 0x05)
         error = sensel.setContactsMask(self.handle, 0x01)
+        error = sensel.setScanDetail(self.handle, 2)
+        error = sensel.setMaxFrameRate(self.handle, 300)
         (error, frame) = sensel.allocateFrameData(self.handle)
         error = sensel.startScanning(self.handle)
         self._frame = frame
         self.force_arrays = []
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-        self.output_stream = cv2.VideoWriter(save_path + 'board.avi', fourcc, 125, (self.C, self.R), 0)
+        self.output_stream = cv2.VideoWriter(save_path + 'board.avi', fourcc, 300, (self.C, self.R), 0)
         self.timestamps = []
         self.contacts = []
 
@@ -81,7 +83,6 @@ class Board():
             for i in range(self._frame.n_contacts):
                 c = self._frame.contacts[i]
                 frame_contacts.append([c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis])
-            self.contacts.append(frame_contacts)
         
         thread_illu.join()
         self._closeSensel()

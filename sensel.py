@@ -151,6 +151,10 @@ def allocateFrameData(handle):
     error = sensel_lib.senselAllocateFrameData(handle, byref(frame_pointer))
     return (error, frame_pointer.contents)
 
+def setMaxFrameRate(handle, frame_rate):
+    error = sensel_lib.senselSetMaxFrameRate(handle, frame_rate)
+    return error
+
 def freeFrameData(handle, frame):
     error = sensel_lib.senselFreeFrameData(handle, byref(frame))
     return error
