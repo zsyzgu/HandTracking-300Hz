@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 import time
 import cv2
-import _thread
+from threading import Thread
 import sensel
 
 class Board():
@@ -49,24 +49,25 @@ class Board():
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
                     self.is_running = False
-                    break
         
+        self.recoarded = cnt
+
+    def _save_data(self):
+        print('[Board] Time = %.3f, FPS = %.1f' % (self.timestamps[-1] - self.timestamps[0], (len(self.timestamps) - 1) / (self.timestamps[-1] - self.timestamps[0])))
+        cnt = self.recoarded
         while cnt < len(self.force_arrays):
             self.output_stream.write(self.force_arrays[cnt])
             cnt += 1
-
-    def _save_data(self):
         self.output_stream.release()
         pickle.dump(self.timestamps, open(self.save_path + 'board_timestamps.pickle', 'wb'))
         pickle.dump(self.contacts, open(self.save_path + 'board_contacts.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
-        _thread.start_new_thread(self._illustration, ())
+        thread_illu = Thread(target=self._illustration, args=())
+        thread_illu.start()
 
         while (self.is_running):
-            t = time.perf_counter()
-
             error = sensel.readSensor(self.handle)
             (error, num_frames) = sensel.getNumAvailableFrames(self.handle)
             for i in range(num_frames):
@@ -81,9 +82,8 @@ class Board():
                 c = self._frame.contacts[i]
                 frame_contacts.append([c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis])
             self.contacts.append(frame_contacts)
-            
-            print(time.perf_counter() - t)
         
+        thread_illu.join()
         self._closeSensel()
         self._save_data()
 

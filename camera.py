@@ -2,7 +2,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import time
-import _thread
+from threading import Thread
 import pickle
 
 class Camera():
@@ -40,17 +40,21 @@ class Camera():
                     cv2.destroyAllWindows()
                     self.is_running = False
         
+        self.recorded = cnt
+        
+    def _save_data(self):
+        print('[Camera] Time = %.3f, FPS = %.1f' % (self.timestamps[-1] - self.timestamps[0], (len(self.timestamps) - 1) / (self.timestamps[-1] - self.timestamps[0])))
+        cnt = self.recorded
         while cnt < len(self.images):
             self.output_stream.write(self.images[cnt])
             cnt += 1
-        
-    def _save_data(self):
         self.output_stream.release()
         pickle.dump(self.timestamps, open(self.save_path + 'camera_timestamps.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
-        _thread.start_new_thread(self._illustration, ())
+        thread_illu = Thread(target=self._illustration, args=())
+        thread_illu.start()
 
         start_time = time.perf_counter()
         last_time_gap = 0
@@ -66,7 +70,7 @@ class Camera():
                 self.images.append(image.copy())
             last_time_gap = time_gap
         
-        print('Time = %.3f, FPS = %.1f' % (time.perf_counter() - start_time, len(self.images) / (time.perf_counter() - start_time)))
+        thread_illu.join()
         self._save_data()
 
 if __name__ == "__main__":
