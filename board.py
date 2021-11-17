@@ -8,6 +8,8 @@ import sensel
 class Board():
     R = 105
     C = 185
+    MAX_X = 230.0
+    MAX_Y = 130.0
 
     def __init__(self, save_path):
         self.save_path = save_path
@@ -17,8 +19,8 @@ class Board():
         self.handle = handle
         (error, self.info) = sensel.getSensorInfo(self.handle)
         error = sensel.setFrameContent(self.handle, 0x05)
-        error = sensel.setContactsMask(self.handle, 0x01)
-        error = sensel.setScanDetail(self.handle, 2)
+        error = sensel.setContactsMask(self.handle, 0x00)
+        error = sensel.setScanDetail(self.handle, 1)
         error = sensel.setMaxFrameRate(self.handle, 300)
         (error, frame) = sensel.allocateFrameData(self.handle)
         error = sensel.startScanning(self.handle)
@@ -45,8 +47,13 @@ class Board():
             else:
                 time.sleep(0.001)
             
-            if cnt % 4 == 1:
-                cv2.imshow('ForceArray', self.force_arrays[-1])
+            if cnt % 20 == 1:
+                image = self.force_arrays[-1].copy()
+                for contact in self.contacts[-1]:
+                    x = int(contact[2] * self.C / self.MAX_X)
+                    y = int(contact[3] * self.R / self.MAX_Y)
+                    cv2.circle(image, (x, y), 2, 255, thickness=-1)
+                cv2.imshow('ForceArray', image)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
@@ -71,18 +78,16 @@ class Board():
 
         while (self.is_running):
             error = sensel.readSensor(self.handle)
-            (error, num_frames) = sensel.getNumAvailableFrames(self.handle)
-            for i in range(num_frames):
-                error = sensel.getFrame(self.handle, self._frame)
+            error = sensel.getFrame(self.handle, self._frame)
             self.timestamps.append(time.perf_counter())
-            force_array = self._frame.force_array[:self.R*self.C]
-            force_array = np.clip((np.reshape(force_array, (self.R, self.C)) * 10),0,255).astype(np.uint8)
+            force_array = np.minimum((np.reshape(self._frame.force_array[:self.R*self.C], (self.R, self.C)) * 10),255).astype(np.uint8)
             self.force_arrays.append(force_array)
 
             frame_contacts = []
             for i in range(self._frame.n_contacts):
                 c = self._frame.contacts[i]
                 frame_contacts.append([c.id, c.state, c.x_pos, c.y_pos, c.area, c.total_force, c.major_axis, c.minor_axis])
+            self.contacts.append(frame_contacts)
         
         thread_illu.join()
         self._closeSensel()
