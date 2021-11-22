@@ -47,7 +47,7 @@ class Board():
             else:
                 time.sleep(0.001)
             
-            if cnt % 20 == 1:
+            if cnt % 5 == 1:
                 image = self.force_arrays[-1].copy()
                 for contact in self.contacts[-1]:
                     x = int(contact[2] * self.C / self.MAX_X)

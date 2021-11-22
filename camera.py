@@ -33,7 +33,7 @@ class Camera():
             else:
                 time.sleep(0.001)
             
-            if cnt % 20 == 1:
+            if cnt % 10 == 1:
                 cv2.imshow('RealSense', self.images[-1])
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
