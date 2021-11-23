@@ -51,20 +51,28 @@ class IMU():
         return [timestamp, gx, gy, gz, ax, ay, az, gra_x, gra_y, gra_z, pitch, self.heading]
     
     def _illustration(self):
-        image = np.zeros((100,100))
+        N = 200
+        image = np.zeros((N,N))
 
         cnt = 0
         while self.is_running:
+            if cnt < len(self.data):
+                cnt += 1
+            else:
+                time.sleep(0.001)
+            
             if cnt % 10 == 1:
+                pitch = self.data[-1][10]
+                normalized_pitch = max(0,min(1,(pitch + np.pi/2) / np.pi))
+                image[:,:N-1] = image[:,1:]
+                image[:,N-1] = 0
+                image[int(normalized_pitch * (N - 1)),N-1] = 255
+                
                 cv2.imshow('RealSense', image)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
                     self.is_running = False
-            else:
-                time.sleep(0.001)
-            cnt += 1
-            
     
     def _save_data(self):
         print('[IMU] Time = %.3f, FPS = %.1f' % (self.data[-1][0] - self.data[0][0], (len(self.data) - 1) / (self.data[-1][0] - self.data[0][0])))
