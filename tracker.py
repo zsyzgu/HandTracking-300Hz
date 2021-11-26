@@ -4,15 +4,20 @@ import cv2
 from skimage.measure import label
 
 class Tracker():
-    BINARY_THRESHOLD = 110
+    BINARY_THRESHOLD = 200
     AREA_MIN_THRESHOLD = 20
     AREA_MAX_THRESHOLD = 1000
     DIST_PER_SEC = 2000
+    FOCAL_LENGTH_D435 = 1.021 # FOV = 91.2
+    WIDTH_D435 = 800.0
+    HEIGHT_D435 = 100.0
+    BASELINE_D435 = 5.0 # The distance between the two infrared cameras
 
     def __init__(self, fps = 300):
         self.fps = fps
         self.Lx = self.Ly = -1
         self.Rx = self.Ry = -1
+        self.pos_x = self.pos_y = self.pos_z = -1
         self.illuL = np.zeros((1,1))
         self.illuR = np.zeros((1,1))
         self.max_dist = 0
@@ -43,17 +48,28 @@ class Tracker():
         output = cv2.line(output, (x-3,y), (x+3,y), color=(0,0,0), thickness=1)
         output = cv2.line(output, (x,y-3), (x,y+3), color=(0,0,0), thickness=1)
         return output
+    
+    def _calc_location_3D(self):
+        if self.Lx != -1 and self.Ly != -1 and self.Rx != -1 and self.Ry != -1:
+            self.pos_z = self.BASELINE_D435 / self.FOCAL_LENGTH_D435 / ((self.Lx - self.Rx) / (self.WIDTH_D435 / 2))
+            self.pos_x = (self.Lx / (self.WIDTH_D435 / 2) - 1) * self.FOCAL_LENGTH_D435 * self.pos_z - (self.BASELINE_D435 / 2)
+            self.pos_y = -(self.Ly / (self.HEIGHT_D435 / 2) - 1) * (self.HEIGHT_D435 / self.WIDTH_D435) * self.FOCAL_LENGTH_D435 * self.pos_z
+        else:
+            self.pos_x = -1
+            self.pos_y = -1
+            self.pos_z = -1
 
     def update(self, imgL, imgR):
         self.Lx, self.Ly = self._track(imgL, self.Lx, self.Ly)
         self.Rx, self.Ry = self._track(imgR, self.Rx, self.Ry)
+        self._calc_location_3D()
         self.illuL = self._draw(imgL, self.Lx, self.Ly)
         self.illuR = self._draw(imgR, self.Rx, self.Ry)
 
 if __name__ == '__main__':
     tracker = Tracker()
 
-    camera_cap = cv2.VideoCapture('data/gyz-6/' + 'camera.avi')
+    camera_cap = cv2.VideoCapture('data/gyz-1/' + 'camera.avi')
     camera_frames = []
     illu = np.zeros((100,800))
     cnt = 0

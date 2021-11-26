@@ -38,7 +38,6 @@ class Camera():
             
             if cnt % 10 == 1:
                 tracker.update(self.images[-1][0], self.images[-1][1])
-                print(np.abs(tracker.Lx - tracker.Rx))
                 cv2.imshow('Camera (L)', tracker.illuL)
                 cv2.imshow('Camera (R)', tracker.illuR)
                 key = cv2.waitKey(1)
