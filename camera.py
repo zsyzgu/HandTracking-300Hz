@@ -2,8 +2,9 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import time
-from threading import Thread
 import pickle
+from threading import Thread
+from tracker import Tracker
 
 class Camera():
     def __init__(self, save_path):
@@ -23,10 +24,12 @@ class Camera():
         self.timestamps = []
 
     def _illustration(self):
+        tracker = Tracker(fps=30)
         cnt = 0
         while self.is_running:
             if cnt < len(self.images):
-                self.output_stream.write(self.images[cnt])
+                image = np.vstack(self.images[cnt])
+                self.output_stream.write(image)
                 if cnt > 0:
                     self.images[cnt-1] = None # release memory
                 cnt += 1
@@ -34,7 +37,10 @@ class Camera():
                 time.sleep(0.001)
             
             if cnt % 10 == 1:
-                cv2.imshow('RealSense', self.images[-1])
+                tracker.update(self.images[-1][0], self.images[-1][1])
+                print(np.abs(tracker.Lx - tracker.Rx))
+                cv2.imshow('Camera (L)', tracker.illuL)
+                cv2.imshow('Camera (R)', tracker.illuR)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
@@ -46,7 +52,8 @@ class Camera():
         print('[Camera] Time = %.3f, FPS = %.1f' % (self.timestamps[-1] - self.timestamps[0], (len(self.timestamps) - 1) / (self.timestamps[-1] - self.timestamps[0])))
         cnt = self.recorded
         while cnt < len(self.images):
-            self.output_stream.write(self.images[cnt])
+            image = np.vstack(self.images[cnt])
+            self.output_stream.write(image)
             cnt += 1
         self.output_stream.release()
         pickle.dump(self.timestamps, open(self.save_path + 'camera_timestamps.pickle', 'wb'))
@@ -56,7 +63,6 @@ class Camera():
         thread_illu = Thread(target=self._illustration, args=())
         thread_illu.start()
 
-        start_time = time.perf_counter()
         last_time_gap = 0
         while self.is_running:
             t = time.perf_counter()
@@ -64,10 +70,9 @@ class Camera():
             time_gap = time.perf_counter() - t
             if time_gap < last_time_gap: # waiting for sync
                 self.timestamps.append(time.perf_counter())
-                frame0 = frames.get_infrared_frame(1)
-                frame1 = frames.get_infrared_frame(2)
-                image = np.vstack([np.asanyarray(frame0.get_data()), np.asanyarray(frame1.get_data())])
-                self.images.append(image.copy())
+                frame0 = np.array(frames.get_infrared_frame(1).get_data())
+                frame1 = np.array(frames.get_infrared_frame(2).get_data())
+                self.images.append([frame0, frame1])
             last_time_gap = time_gap
         
         thread_illu.join()

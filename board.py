@@ -21,7 +21,7 @@ class Board():
         error = sensel.setFrameContent(self.handle, 0x05)
         error = sensel.setContactsMask(self.handle, 0x00)
         error = sensel.setScanDetail(self.handle, 1)
-        error = sensel.setMaxFrameRate(self.handle, 300)
+        error = sensel.setMaxFrameRate(self.handle, 150)
         (error, frame) = sensel.allocateFrameData(self.handle)
         error = sensel.startScanning(self.handle)
         self._frame = frame

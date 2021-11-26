@@ -2,8 +2,10 @@ from time import sleep
 import cv2
 import pickle
 import time
+import sys
+import os
 
-def main(load_path):
+def check(load_path):
     # ===== Input =====
 
     board_cap = cv2.VideoCapture(load_path + 'board.avi')
@@ -44,5 +46,8 @@ def main(load_path):
         t += (1.0 / FPS) * speed
 
 if __name__ == '__main__':
-    main('data/')
-    
+    if len(sys.argv) != 2:
+        print('[Usage] python check.py userName-taskId')
+        exit()
+    save_path = 'data/' + sys.argv[1] + '/'
+    check(save_path)

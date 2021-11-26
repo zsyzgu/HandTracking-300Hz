@@ -1,10 +1,11 @@
 import multiprocessing
 import pickle
 import time
+import sys
+import os
 from camera import Camera
 from board import Board
 from imu import IMU
-from numpy.lib.npyio import save
 
 def process_imu(save_path):
     imu = IMU(save_path)
@@ -24,7 +25,18 @@ def sync_timestamps(file_path, gap):
     pickle.dump(timestamps, open(file_path, 'wb'))
 
 if __name__ == '__main__':
-    save_path = 'data/'
+    if len(sys.argv) != 2:
+        print('[Usage] python main.py userName-taskId')
+        exit()
+        # taskId
+        # (1) single tap * 50
+        # (2) continuous tap * 50
+        # (3) long press * 50
+        # (4) drag * 50
+        # (5) slide * 50
+        # (6) in-air tap * 50
+    save_path = 'data/' + sys.argv[1] + '/'
+    os.mkdir(save_path)
     p_imu = multiprocessing.Process(target=process_imu, args=(save_path,))
     p_camera = multiprocessing.Process(target=process_camera, args=(save_path,))
     p_board = multiprocessing.Process(target=process_board, args=(save_path,))

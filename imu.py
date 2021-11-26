@@ -11,9 +11,9 @@ from threading import Thread
 
 class IMU():
     #9250
-    offset_gx = -0.131
-    offset_gy = -0.144
-    offset_gz = +0.084
+    offset_gx = -0.284
+    offset_gy = -0.139
+    offset_gz = +0.136
 
     def __init__(self, save_path):
         self.save_path = save_path
@@ -85,10 +85,10 @@ class IMU():
         gy_array = []
         gz_array = []
         for i in range(1000):
-            data = self.get_data()
-            gx_array.append(data[0])
-            gy_array.append(data[1])
-            gz_array.append(data[2])
+            data = self._get_data()
+            gx_array.append(data[1])
+            gy_array.append(data[2])
+            gz_array.append(data[3])
         print('offset_gx = ', np.mean(gx_array))
         print('offset_gy = ', np.mean(gy_array))
         print('offset_gz = ', np.mean(gz_array))
