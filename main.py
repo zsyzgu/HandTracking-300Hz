@@ -24,17 +24,23 @@ def sync_timestamps(file_path, gap):
     timestamps = [t + gap for t in timestamps]
     pickle.dump(timestamps, open(file_path, 'wb'))
 
+# TaskId
+# (1) single tap * 50
+# (2) continuous tap * 50
+# (3) long press * 50
+# (4) drag * 50
+# (5) slide * 50
+# (6) in-air tap * 50
+
+# Data
+# board_data.pickle [timestamps contacts]; contacts = [frame_contacts...]
+# camera_data.pickle [timestamps locations]
+# imu_data.pickle [timestamp, gx, gy, gz, ax, ay, az, gra_x, gra_y, gra_z, pitch, heading]
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('[Usage] python main.py userName-taskId')
         exit()
-        # taskId
-        # (1) single tap * 50
-        # (2) continuous tap * 50
-        # (3) long press * 50
-        # (4) drag * 50
-        # (5) slide * 50
-        # (6) in-air tap * 50
     save_path = 'data/' + sys.argv[1] + '/'
     os.mkdir(save_path)
     p_imu = multiprocessing.Process(target=process_imu, args=(save_path,))

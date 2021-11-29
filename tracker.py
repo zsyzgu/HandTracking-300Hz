@@ -58,6 +58,9 @@ class Tracker():
             self.pos_x = -1
             self.pos_y = -1
             self.pos_z = -1
+    
+    def get_location(self):
+        return [self.pos_x, self.pos_y, self.pos_z]
 
     def update(self, imgL, imgR):
         self.Lx, self.Ly = self._track(imgL, self.Lx, self.Ly)

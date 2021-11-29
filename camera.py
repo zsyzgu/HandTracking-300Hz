@@ -22,9 +22,9 @@ class Camera():
         fourcc = cv2.VideoWriter_fourcc(*'DIVX')
         self.output_stream = cv2.VideoWriter(save_path + 'camera.avi', fourcc, 30, (848, 200), 0)
         self.timestamps = []
+        self.locations = [] # fingertip location
 
     def _illustration(self):
-        tracker = Tracker(fps=30)
         cnt = 0
         while self.is_running:
             if cnt < len(self.images):
@@ -37,9 +37,8 @@ class Camera():
                 time.sleep(0.001)
             
             if cnt % 10 == 1:
-                tracker.update(self.images[-1][0], self.images[-1][1])
-                cv2.imshow('Camera (L)', tracker.illuL)
-                cv2.imshow('Camera (R)', tracker.illuR)
+                cv2.imshow('Camera (L)', self.tracker.illuL)
+                cv2.imshow('Camera (R)', self.tracker.illuR)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     cv2.destroyAllWindows()
@@ -55,10 +54,11 @@ class Camera():
             self.output_stream.write(image)
             cnt += 1
         self.output_stream.release()
-        pickle.dump(self.timestamps, open(self.save_path + 'camera_timestamps.pickle', 'wb'))
+        pickle.dump([self.timestamps, self.locations], open(self.save_path + 'camera_data.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
+        self.tracker = Tracker()
         thread_illu = Thread(target=self._illustration, args=())
         thread_illu.start()
 
@@ -71,6 +71,8 @@ class Camera():
                 self.timestamps.append(time.perf_counter())
                 frame0 = np.array(frames.get_infrared_frame(1).get_data())
                 frame1 = np.array(frames.get_infrared_frame(2).get_data())
+                self.tracker.update(frame0, frame1)
+                self.locations.append(self.tracker.get_location())
                 self.images.append([frame0, frame1])
             last_time_gap = time_gap
         

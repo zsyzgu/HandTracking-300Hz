@@ -68,8 +68,7 @@ class Board():
             self.output_stream.write(self.force_arrays[cnt])
             cnt += 1
         self.output_stream.release()
-        pickle.dump(self.timestamps, open(self.save_path + 'board_timestamps.pickle', 'wb'))
-        pickle.dump(self.contacts, open(self.save_path + 'board_contacts.pickle', 'wb'))
+        pickle.dump([self.timestamps, self.contacts], open(self.save_path + 'board_data.pickle', 'wb'))
 
     def run(self):
         self.is_running = True
