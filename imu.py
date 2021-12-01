@@ -11,21 +11,21 @@ from threading import Thread
 
 class IMU():
     #9250
-    offset_gx = -0.284
-    offset_gy = -0.139
-    offset_gz = +0.136
+    offset_gx = +0.0021
+    offset_gy = -0.2239
+    offset_gz = -0.0666
 
     def __init__(self, save_path):
         self.save_path = save_path
         self.ser = serial.Serial('COM5', 250000)
         time.sleep(1)
         self.ser.read(self.ser.in_waiting)
-        self.mad = madgwickahrs.MadgwickAHRS(0.001)
+        self.mad = madgwickahrs.MadgwickAHRS(0.000833) # 1200 FPS
         self.heading = 0
         self.data = []
     
     def _read_buf(self, data, offset):
-        return int.from_bytes(data[offset:offset+2],byteorder='little',signed=True)
+        return int.from_bytes(data[offset:offset+2],byteorder='big',signed=True)
 
     def _get_data(self):
         while (self.mad == None):
@@ -44,8 +44,6 @@ class IMU():
         ax -= gra_x
         ay -= gra_y
         az -= gra_z
-        gra_x = min(gra_x, +1)
-        gra_x = max(gra_x, -1)
         pitch, heading = self.mad.calc_angles()
         self.heading += gz * 0.001
         return [timestamp, gx, gy, gz, ax, ay, az, gra_x, gra_y, gra_z, pitch, self.heading]
@@ -84,7 +82,7 @@ class IMU():
         gx_array = []
         gy_array = []
         gz_array = []
-        for i in range(1000):
+        for i in range(10000):
             data = self._get_data()
             gx_array.append(data[1])
             gy_array.append(data[2])

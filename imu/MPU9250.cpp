@@ -64,6 +64,24 @@ uint8_t MPU9250::begin() {
   return 0;
 }
 
+void MPU9250::get_data(int8_t* data) {
+  __read_bytes(MPU9250_ADDRESS, ACCEL_XOUT_H, 6);
+  *(data+0) = Wire.read();
+  *(data+1) = Wire.read();
+  *(data+2) = Wire.read();
+  *(data+3) = Wire.read();
+  *(data+4) = Wire.read();
+  *(data+5) = Wire.read();
+  //while(!(__read_byte(MPU9250_ADDRESS, INT_STATUS)&0b1));
+  __read_bytes(MPU9250_ADDRESS, GYRO_XOUT_H, 6);
+  *(data+6) = Wire.read();
+  *(data+7) = Wire.read();
+  *(data+8) = Wire.read();
+  *(data+9) = Wire.read();
+  *(data+10) = Wire.read();
+  *(data+11) = Wire.read();
+}
+
 /**************************************
 Accel
 **************************************/

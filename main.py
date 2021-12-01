@@ -20,9 +20,9 @@ def process_board(save_path):
     board.run()
 
 def sync_timestamps(file_path, gap):
-    timestamps = pickle.load(open(file_path, 'rb'))
+    [timestamps, other_data] = pickle.load(open(file_path, 'rb'))
     timestamps = [t + gap for t in timestamps]
-    pickle.dump(timestamps, open(file_path, 'wb'))
+    pickle.dump([timestamps, other_data], open(file_path, 'wb'))
 
 # TaskId
 # (1) single tap * 50
@@ -55,5 +55,5 @@ if __name__ == '__main__':
     p_imu.join()
     p_camera.join()
     p_board.join()
-    sync_timestamps(save_path + 'camera_timestamps.pickle', start_time_camera - start_time_imu)
-    sync_timestamps(save_path + 'board_timestamps.pickle', start_time_board - start_time_imu)
+    sync_timestamps(save_path + 'camera_data.pickle', start_time_camera - start_time_imu)
+    sync_timestamps(save_path + 'board_data.pickle', start_time_board - start_time_imu)

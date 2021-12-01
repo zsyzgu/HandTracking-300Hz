@@ -4,7 +4,7 @@ import cv2
 from skimage.measure import label
 
 class Tracker():
-    BINARY_THRESHOLD = 200
+    BINARY_THRESHOLD = 150
     AREA_MIN_THRESHOLD = 20
     AREA_MAX_THRESHOLD = 1000
     DIST_PER_SEC = 2000
@@ -72,7 +72,7 @@ class Tracker():
 if __name__ == '__main__':
     tracker = Tracker()
 
-    camera_cap = cv2.VideoCapture('data/gyz-1/' + 'camera.avi')
+    camera_cap = cv2.VideoCapture('data/gyz-5/' + 'camera.avi')
     camera_frames = []
     illu = np.zeros((100,800))
     cnt = 0
@@ -92,14 +92,14 @@ if __name__ == '__main__':
         cv2.imshow('R', tracker.illuR)
 
         if tracker.Ly != -1:
-            y = int((tracker.Ly + tracker.Ry) / 2)
+            y = int(99 - (tracker.pos_y * 30 + 50))
             y = max(0,min(99,y))
             illu[:,:800-1] = illu[:,1:]
             illu[:,800-1] = 0
             illu[y,800-1] = 255
         cv2.imshow('illu', illu)
 
-        key = cv2.waitKey(1)
+        key = cv2.waitKey(10)
         if key & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break

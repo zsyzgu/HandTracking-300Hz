@@ -28,19 +28,20 @@ void setup(void) {
 
 void loop() {
   t = micros();
-  mpu.get_accel();
-  *ax = mpu.x;
-  *ay = mpu.y;
-  *az = mpu.z;
-  mpu.get_gyro();
-  *gx = mpu.gx;
-  *gy = mpu.gy;
-  *gz = mpu.gz;
+  mpu.get_data((int8_t*)ax);
+//  mpu.get_accel();
+//  *ax = mpu.x;
+//  *ay = mpu.y;
+//  *az = mpu.z;
+//  mpu.get_gyro();
+//  *gx = mpu.gx;
+//  *gy = mpu.gy;
+//  *gz = mpu.gz;
   Serial.write(buf, 12);
-//  Serial.print(*ax);
+//  Serial.print((*ax)/4096.0);
 //  Serial.print(",");
-//  Serial.print(*ay);
+//  Serial.print((*ay)/4096.0);
 //  Serial.print(",");
-//  Serial.println(*az);
-  while (micros() - t < 1000);
+//  Serial.println((*az)/4096.0);
+  while (micros() - t < 825);
 }

@@ -68,6 +68,9 @@ class MPU9250
 {
   public:
     uint8_t begin();
+
+    //Get Accel and Gyro quickly
+    void get_data(int8_t*);
   
     //Accel
     void get_accel();
