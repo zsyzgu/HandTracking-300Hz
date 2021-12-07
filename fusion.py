@@ -133,7 +133,7 @@ def check_location(load_path):
                 k += 1
             for t in range(k-15,k+15):
                 if t >= 0 and t+1 < len(imu_accers) and imu_accers[t] < 0 and imu_accers[t+1] >= 0:
-                    #touch_time = imu_timestamps[t]
+                    touch_time = imu_timestamps[t]
                     break
 
             while (j+1 < len(camera_timestamps) and camera_timestamps[j+1] <= touch_time - RANGE):
@@ -157,11 +157,24 @@ def check_location(load_path):
     Y = np.array([np.mean(Ys[:,i]) for i in range(len(X))])
     S = np.array([np.std(Ys[:,i]) for i in range(len(X))])
     print(assess(X,Ys))
-    # for i in range(len(Ys)):
-    #     plt.plot(X,Ys[i])
+    #for i in range(len(Ys)):
+    #    plt.plot(X,Ys[i])
     plt.plot(X,Y)
-    plt.plot(X,Y+S)
-    plt.plot(X,Y-S)
+
+    X_ = []
+    Y_ = []
+    for i in range(len(X)):
+        x = X[i]
+        y = Y[i]
+        if (x >= -0.05 and x <= -0.01):
+            X_.append(x)
+            Y_.append(y)
+
+    z1 = np.polyfit(X_, np.array(Y_)*0.01,3)
+    p1 = np.poly1d(z1)
+    print(p1)
+    #plt.plot(X_,Y_)
+    
     plt.show()
 
 if __name__ == '__main__':

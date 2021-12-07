@@ -4,14 +4,16 @@ import cv2
 from skimage.measure import label
 
 class Tracker():
-    BINARY_THRESHOLD = 150
-    AREA_MIN_THRESHOLD = 20
+    BINARY_THRESHOLD = 180
+    MIN_BINARY_THRESHOLD = 100
+    AREA_MIN_THRESHOLD = 15
     AREA_MAX_THRESHOLD = 1000
     DIST_PER_SEC = 2000
     FOCAL_LENGTH_D435 = 1.021 # FOV = 91.2
     WIDTH_D435 = 800.0
     HEIGHT_D435 = 100.0
     BASELINE_D435 = 5.0 # The distance between the two infrared cameras
+    REDUNDANT_PIXEL = 200
 
     def __init__(self, fps = 300):
         self.fps = fps
@@ -23,7 +25,11 @@ class Tracker():
         self.max_dist = 0
     
     def _track(self, image, lastX, lastY):
-        _, binImg = cv2.threshold(image, self.BINARY_THRESHOLD, 255, type=cv2.THRESH_BINARY)
+        center_image = image[:,self.REDUNDANT_PIXEL:int(self.WIDTH_D435)-self.REDUNDANT_PIXEL]
+        center_image = np.resize(center_image, (int(np.shape(center_image)[0]//10), int(np.shape(center_image)[1]//10)))
+        max_brightness = np.max(center_image)
+        threshold = int(max(self.BINARY_THRESHOLD * max_brightness / 255, self.MIN_BINARY_THRESHOLD))
+        _, binImg = cv2.threshold(image, threshold, 255, type=cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(binImg, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         max_size = 0
         ans_x = -1
@@ -35,7 +41,7 @@ class Tracker():
                 x = M['m10'] / M['m00']
                 y = M['m01'] / M['m00']
                 dist = ((x - lastX) ** 2 + (y - lastY) ** 2) ** 0.5
-                if (lastX == -1 and lastY == -1) or dist * self.fps <= self.DIST_PER_SEC:
+                if ((lastX == -1 and lastY == -1) or dist * self.fps <= self.DIST_PER_SEC) and (self.REDUNDANT_PIXEL <= x and x < int(self.WIDTH_D435) - self.REDUNDANT_PIXEL) :
                     max_size = size
                     ans_x = x
                     ans_y = y
