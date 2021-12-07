@@ -101,11 +101,27 @@ def check_imu(load_path):
     plt.plot(X, Y)
     plt.show()
 
+def check_contact(board_contacts, i): # check if the contact is legal or not (at least last for 30 ms)
+    id = -1
+    for c in board_contacts[i]:
+        if c[1] == 1:
+            id = c[0]
+
+    for j in range(i+1, min(i+10,len(board_contacts))):
+        is_exist = False
+        for c in board_contacts[j]:
+            if c[0] == id:
+                is_exist = True
+        if not is_exist:
+            return False
+
+    return True
+
 def check_location(load_path):
     RANGE = 0.3
 
     [board_timestamps, board_contacts] = pickle.load(open(load_path + 'board_data.pickle', 'rb'))
-    [camera_timestamps, fingertip_locations] = pickle.load(open(load_path + 'camera_data.pickle', 'rb'))
+    [camera_timestamps, fingertip_locations] = pickle.load(open(load_path + 'camera_data_re.pickle', 'rb'))
     imu_data = pickle.load(open(load_path + 'imu_data.pickle', 'rb'))
     imu_timestamps = []
     imu_accers = []
@@ -123,7 +139,7 @@ def check_location(load_path):
     for i in range(len(board_timestamps)):
         is_touch_down = False
         for c in board_contacts[i]:
-            if c[1] == 1: # touch down
+            if c[1] == 1 and check_contact(board_contacts, i): # touch down
                 is_touch_down = True
 
         if is_touch_down:
@@ -131,10 +147,14 @@ def check_location(load_path):
 
             while (k+1 < len(imu_timestamps) and imu_timestamps[k+1] <= touch_time):
                 k += 1
-            for t in range(k-15,k+15):
-                if t >= 0 and t+1 < len(imu_accers) and imu_accers[t] < 0 and imu_accers[t+1] >= 0:
-                    touch_time = imu_timestamps[t]
-                    break
+            
+            # max_diff = 0 # Using imu to sync timestamps
+            # for t in range(k-12,k+12):
+            #     if t >= 0 and t+1 < len(imu_accers):
+            #         diff = imu_accers[t+1] - imu_accers[t]
+            #         if diff > max_diff:
+            #             max_diff = diff
+            #             touch_time = imu_timestamps[t]
 
             while (j+1 < len(camera_timestamps) and camera_timestamps[j+1] <= touch_time - RANGE):
                 j += 1
@@ -142,8 +162,9 @@ def check_location(load_path):
             Y = []
             l = j
             while (l < len(camera_timestamps) and camera_timestamps[l] <= touch_time + RANGE):
-                X.append(camera_timestamps[l] - touch_time)
-                Y.append(fingertip_locations[l][1])
+                if fingertip_locations[l][1] != -1:
+                    X.append(camera_timestamps[l] - touch_time)
+                    Y.append(fingertip_locations[l][1])
                 l += 1
             X, Y = resample(X, Y)
             if len(X) != 0:
@@ -151,36 +172,42 @@ def check_location(load_path):
                 Xs.append(X)
                 Ys.append(Y)
     
+    if len(Xs) == 0:
+        return
     Xs = np.array(Xs)
     Ys = np.array(Ys)
     X = Xs[0,:]
     Y = np.array([np.mean(Ys[:,i]) for i in range(len(X))])
     S = np.array([np.std(Ys[:,i]) for i in range(len(X))])
-    print(assess(X,Ys))
-    #for i in range(len(Ys)):
-    #    plt.plot(X,Ys[i])
+    print(len(Ys), assess(X,Ys))
+    for i in range(len(Ys)):
+        plt.plot(X,Ys[i])
     plt.plot(X,Y)
+    plt.plot(X,Y+S)
+    plt.plot(X,Y-S)
 
-    X_ = []
-    Y_ = []
-    for i in range(len(X)):
-        x = X[i]
-        y = Y[i]
-        if (x >= -0.05 and x <= -0.01):
-            X_.append(x)
-            Y_.append(y)
-
-    z1 = np.polyfit(X_, np.array(Y_)*0.01,3)
-    p1 = np.poly1d(z1)
-    print(p1)
-    #plt.plot(X_,Y_)
+    # X_ = []
+    # Y_ = []
+    # for i in range(len(X)):
+    #     x = X[i]
+    #     y = Y[i]
+    #     if (x >= -0.05 and x <= -0.01):
+    #         X_.append(x)
+    #         Y_.append(y)
+    # plt.plot(X_,Y_)
     
     plt.show()
 
 if __name__ == '__main__':
+    # dirs = os.listdir('./data')
+    # for dir in dirs:
+    #     print(dir)
+    #     load_path = 'data/' + dir + '/'
+    #     check_location(load_path)
+    # exit()
+
     if len(sys.argv) != 2:
         print('[Usage] python check.py userName-taskId')
         exit()
     load_path = 'data/' + sys.argv[1] + '/'
-    #check_imu(load_path)
     check_location(load_path)

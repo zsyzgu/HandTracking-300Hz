@@ -25,8 +25,9 @@ class Tracker():
         self.max_dist = 0
     
     def _track(self, image, lastX, lastY):
+        t = time.perf_counter()
         center_image = image[:,self.REDUNDANT_PIXEL:int(self.WIDTH_D435)-self.REDUNDANT_PIXEL]
-        center_image = np.resize(center_image, (int(np.shape(center_image)[0]//10), int(np.shape(center_image)[1]//10)))
+        center_image = cv2.resize(center_image, (int(np.shape(center_image)[1]//5), int(np.shape(center_image)[0]//5)))
         max_brightness = np.max(center_image)
         threshold = int(max(self.BINARY_THRESHOLD * max_brightness / 255, self.MIN_BINARY_THRESHOLD))
         _, binImg = cv2.threshold(image, threshold, 255, type=cv2.THRESH_BINARY)

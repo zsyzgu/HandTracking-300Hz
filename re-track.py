@@ -29,10 +29,12 @@ def re_track(load_path):
         frame1 = frame[H//2:,:]
         tracker.update(frame0, frame1)
         new_fingertip_locations.append(tracker.get_location())
-        if i % 10 == 0:
-           cv2.imshow('illuL', tracker.illuL)
-           cv2.imshow('illuR', tracker.illuR)
-           cv2.waitKey(1)
+        if i % 20 == 0:
+            cv2.imshow('illuL', tracker.illuL)
+            cv2.imshow('illuR', tracker.illuR)
+            cv2.waitKey(1)
+
+    pickle.dump([camera_timestamps, new_fingertip_locations], open(load_path + 'camera_data_re.pickle', 'wb'))
 
     evaluate(fingertip_locations)
     evaluate(new_fingertip_locations)
@@ -41,12 +43,19 @@ def evaluate(fingertip_locations):
     fingertip_locations = np.array(fingertip_locations)
     cnt = np.sum(fingertip_locations[:,0]==-1)
     print(cnt, len(fingertip_locations))
-    X = fingertip_locations[:,0]
-    Y = fingertip_locations[:,1]
-    plt.plot(X, Y)
-    plt.show()
+    #X = fingertip_locations[:,0]
+    #Y = fingertip_locations[:,1]
+    #plt.plot(X, Y)
+    #plt.show()
 
 if __name__ == '__main__':
+    # dirs = os.listdir('./data')
+    # for dir in dirs:
+    #     print(dir)
+    #     load_path = 'data/' + dir + '/'
+    #     re_track(load_path)
+    # exit()
+
     if len(sys.argv) != 2:
         print('[Usage] python check.py userName-taskId')
         exit()
