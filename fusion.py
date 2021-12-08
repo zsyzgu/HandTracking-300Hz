@@ -7,6 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import resample
+from scipy.optimize import minimize
 
 def prepare_imu(load_path):
     [board_timestamps, board_contacts] = pickle.load(open(load_path + 'board_data.pickle', 'rb'))
@@ -132,8 +133,9 @@ def check_location(load_path):
         accer = ax * gra_x + ay * gra_y + az * gra_z
         imu_accers.append(accer)
 
+    Ts = []
     Xs = []
-    Ys = []
+    As = []
     j = 0 # index for locations
     k = 0 # index for imu
     for i in range(len(board_timestamps)):
@@ -145,58 +147,123 @@ def check_location(load_path):
         if is_touch_down:
             touch_time = board_timestamps[i]
 
-            while (k+1 < len(imu_timestamps) and imu_timestamps[k+1] <= touch_time):
+            while (k+1 < len(imu_timestamps) and imu_timestamps[k+1] <= touch_time - RANGE):
                 k += 1
-            
-            # max_diff = 0 # Using imu to sync timestamps
-            # for t in range(k-12,k+12):
-            #     if t >= 0 and t+1 < len(imu_accers):
-            #         diff = imu_accers[t+1] - imu_accers[t]
-            #         if diff > max_diff:
-            #             max_diff = diff
-            #             touch_time = imu_timestamps[t]
+            T = []
+            A = []
+            l = k
+            while (l < len(imu_timestamps) and imu_timestamps[l] <= touch_time + RANGE):
+                T.append(imu_timestamps[l] - touch_time)
+                A.append(imu_accers[l])
+                l += 1
+            T, A = resample(T, A)
+            if len(T) != 0:
+                Ts.append(T)
+                As.append(A)
 
             while (j+1 < len(camera_timestamps) and camera_timestamps[j+1] <= touch_time - RANGE):
                 j += 1
+            T = []
             X = []
-            Y = []
             l = j
             while (l < len(camera_timestamps) and camera_timestamps[l] <= touch_time + RANGE):
                 if fingertip_locations[l][1] != -1:
-                    X.append(camera_timestamps[l] - touch_time)
-                    Y.append(fingertip_locations[l][1])
+                    T.append(camera_timestamps[l] - touch_time)
+                    X.append(fingertip_locations[l][1])
                 l += 1
-            X, Y = resample(X, Y)
-            if len(X) != 0:
-                Y = np.array(Y) - np.min(Y)
+            T, X = resample(T, X)
+            if len(T) != 0:
+                X = np.array(X) - np.min(X)
+                Ts.append(T)
                 Xs.append(X)
-                Ys.append(Y)
     
     if len(Xs) == 0:
         return
+    Ts = np.array(Ts)
     Xs = np.array(Xs)
-    Ys = np.array(Ys)
-    X = Xs[0,:]
-    Y = np.array([np.mean(Ys[:,i]) for i in range(len(X))])
-    S = np.array([np.std(Ys[:,i]) for i in range(len(X))])
-    print(len(Ys), assess(X,Ys))
-    for i in range(len(Ys)):
-        plt.plot(X,Ys[i])
-    plt.plot(X,Y)
-    plt.plot(X,Y+S)
-    plt.plot(X,Y-S)
-
-    # X_ = []
-    # Y_ = []
-    # for i in range(len(X)):
-    #     x = X[i]
-    #     y = Y[i]
-    #     if (x >= -0.05 and x <= -0.01):
-    #         X_.append(x)
-    #         Y_.append(y)
-    # plt.plot(X_,Y_)
-    
+    As = np.array(As)
+    T = Ts[0,:]
+    X = np.array([np.mean(Xs[:,i]) for i in range(len(T))])
+    A = np.array([np.mean(As[:,i]) for i in range(len(T))])
+    #print(len(Xs), assess(T,Xs))
+    # for i in range(len(Xs)):
+    #     plt.plot(T,Xs[i])
+    plt.plot(T,X)
+    plt.plot(T,A)
     plt.show()
+
+    for id in range(10):
+        T_ = []
+        X_ = []
+        A_ = []
+        for i in range(len(T)):
+            t = T[i]
+            x = Xs[id][i]
+            a = As[id][i]
+            if (t >= -0.05 and t <= -0.01):
+                T_.append(t)
+                X_.append(x)
+                A_.append(a)
+
+        #calc(X_, Y_)
+        x0 = np.array((0.3, 0.1, 0, 0))
+        res = minimize(func_x(T_, X_), x0, method='SLSQP', constraints=con(T_, X_))
+        print(res.fun)
+        print(res.success)
+        print(res.x)
+        
+        plt.plot(T_,X_)
+        plt.show()
+
+def func_x(T, X):
+    n = len(T)
+    k = 1.0 / n
+    fun = lambda x: np.sum([(X[i] - ((-15 * (x[0]*i*k+x[1])**4 + 6 * (x[0]*i*k+x[1])**5 + 10 * (x[0]*i*k+x[1])**3) * x[2] + x[3])) ** 2 for i in range(n)])
+    return fun
+
+def func_a(T, A):
+    n = len(T)
+    k = 1.0 / n
+    fun = lambda x: np.sum([(A[i] - ((-180 * (x[0]*i*k+x[1])**2 + 120 * (x[0]*i*k+x[1])**3 + 60 * (x[0]*i*k+x[1])**1) * x[2])) ** 2 for i in range(n)])
+    return fun
+
+def con(T, X):
+    cons = (
+        {'type': 'ineq', 'fun': lambda x: x[0]},
+        {'type': 'ineq', 'fun': lambda x: x[1]},
+        {'type': 'ineq', 'fun': lambda x: 0.5 - x[0] - x[1]}
+    )
+    return cons
+
+def calc(T, X):
+    kt = symbols('kt')
+    bt = symbols('bt')
+    kx = symbols('kx')
+    bx = symbols('bx')
+    a1 = symbols('a1')
+    a2 = symbols('a2')
+    a3 = symbols('a3')
+
+    L = a1 * (-kt) + a2 * (-bt) + a3 * (kt + bt - 0.5)
+
+    n = len(T)
+    for i in range(n):
+        t = kt * i + bt
+        x = (-15 * t**4 + 6 * t**5 + 10 * t**3) * kx + bx
+        L = L + (X[i] - x) ** 2
+    
+    dify_kt = diff(L, kt)
+    dify_bt = diff(L, bt)
+    dify_kx = diff(L, kx)
+    dify_bx = diff(L, bx)
+    dual_a1 = a1 * (-kt)
+    dual_a2 = a2 * (-bt)
+    dual_a3 = kt + bt - 0.5
+    print(1)
+    aa = solve([dify_kt, dify_bt, dify_kx, dify_bx, dual_a1, dual_a2, dual_a3], [kt, bt, kx, bx, a1, a2, a3])
+    print(2)
+    for i in aa:
+        print(i)
 
 if __name__ == '__main__':
     # dirs = os.listdir('./data')
