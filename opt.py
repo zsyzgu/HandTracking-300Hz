@@ -6,8 +6,11 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize.nonlin import Jacobian
 from scipy.signal import resample
 from scipy.optimize import minimize
+from scipy.optimize import basinhopping
+import scipy.optimize
 
 def resample(X, Y):
     st = -0.25
@@ -29,16 +32,6 @@ def resample(X, Y):
         y = Y[j] * (1-k) + Y[j+1] * k
         Y_.append(y)
     return T, Y_
-
-def assess(X,Ys):
-    Y = np.array([np.mean(Ys[:,i]) for i in range(len(X))])
-    N = int(len(X) * 0.4)
-    errors = []
-    for i in range(len(Ys)):
-        diff = Ys[i] - Y
-        error = np.sum(diff[N:-N]*diff[N:-N])
-        errors.append(error)
-    return np.mean(errors)
 
 def check_contact(board_contacts, i): # check if the contact is legal or not (at least last for 30 ms)
     id = -1
@@ -130,7 +123,7 @@ def check_location(load_path):
     # plt.plot(T,A)
     # plt.show()
 
-    for id in range(1):
+    for id in range(5):
         T_ = []
         X_ = []
         A_ = []
@@ -142,50 +135,99 @@ def check_location(load_path):
                 T_.append(t)
                 X_.append(x)
                 A_.append(a)
+        T_ = np.array(T_) - T_[0]
 
-        #calc(X_, Y_)
-        x0 = np.array((0.3, 0.1, 0, 0))
-        res = minimize(objective, x0, args=(T_, X_, A_), method='SLSQP', constraints=con(T_, A_))
+        x0 = 0.01
+        x1 = -0.01
+        a = -2.5
+        ts = 0.01 # The timestamp of the first frame
+        t1 = 0.2 # the duration of the whole touch
+        
+        guess = np.array((x0, x1, a, ts, t1))
+        cons = (
+            # {'type': 'ineq', 'fun': con_ineq1},
+            # {'type': 'ineq', 'fun': con_ineq2},
+            # {'type': 'ineq', 'fun': con_ineq3},
+            # {'type': 'ineq', 'fun': con_ineq4}
+        )
+        bnds = ((0,0.03), (-0.03,0), (-5,0), (0.00,0.03), (0.05,0.3))
+        res = minimize(objective, guess, args=(T_, X_, A_), method='powell', constraints=cons, bounds=bnds)
+
         print(res.fun)
         print(res.success)
-        print('%.3f %.3f %.3f %.3f' % (res.x[0],res.x[1],res.x[2],res.x[3]))
-        
-        plt.plot(T_,X_)
-        plt.plot(T_,A_)
+        args = res.x
+        x0, x1, a, ts, t1 = args
+        print('x0=%.3f, x1=%.3f, a=%.3f, ts=%.3f, t1=%.3f' % (x0, x1, a, ts, t1))
+
+        T_pred = []
+        X_pred = []
+        A_pred = []
+        for i in range(300):
+            t = i * 0.001
+            if t > t1:
+                break
+            r = t / t1
+            x = x0 + (x1 - x0) * S_r(r, args)
+            a = (x1 - x0) * A_r(r, args) / (t1**2)
+            T_pred.append(t)
+            X_pred.append(x)
+            A_pred.append(a)
+        plt.subplot(1, 2, 1)
+        plt.plot(T_pred, X_pred)
+        plt.plot(T_+ts, X_)
+        plt.subplot(1, 2, 2)
+        plt.plot(T_pred, A_pred)
+        plt.plot(T_+ts, A_)
+
         plt.show()
 
-def objective(x, T, X, A):
-    Kt = x[0]
-    Bt = x[1]
-    Kx = x[2]
-    Bx = x[3]
-    n = len(T)
-    k = 1.0 / n
+def S_r(r, args):
+    x0, x1, a, ts, t1 = args
+    a3 = 10 + a * 0.5
+    a4 = -15 - a
+    a5 = 6 + a * 0.5
+    x = a3 * r**3 + a4 * r**4 + a5 * r**5
+    return x
+
+def V_r(r, args):
+    x0, x1, a, ts, t1 = args
+    a3 = 10 + a * 0.5
+    a4 = -15 - a
+    a5 = 6 + a * 0.5
+    v = 3 * a3 * r**2 + 4 * a4 * r**3 + 5 * a5 * r**4
+    return v
+
+def A_r(r, args):
+    x0, x1, a, ts, t1 = args
+    a3 = 10 + a * 0.5
+    a4 = -15 - a
+    a5 = 6 + a * 0.5
+    a = 6 * a3 * r + 12 * a4 * r**2 + 20 * a5 * r**3
+    return a
+
+def objective(args, T, X, A):
+    x0, x1, a, ts, t1 = args
+    a3 = 10 + a * 0.5
+    a4 = -15 - a
+    a5 = 6 + a * 0.5
+    N = len(T)
     error = 0
-    for i in range(n):
-        t = Kt * i * k + Bt
-        error += (X[i] - ((-15 * t**4 + 6 * t**5 + 10 * t**3) * Kx + Bx)) ** 2
-    for i in range(n):
-        t = Kt * i * k + Bt
-        error += (A[i] - ((-180 * t**2 + 120 * t**3 + 60 * t**1) * Kx)) ** 2
+    k = 5e-8 # Acc
+    for i in range(N):
+        r = (ts + T[i]) / t1
+        x = x0 + (x1 - x0) * S_r(r, args)
+        error += (X[i] - x) ** 2
+    for i in range(N):
+        r = (ts + T[i]) / t1
+        a = (x1 - x0) * A_r(r, args) / (t1**2)
+        error += (A[i] - a) ** 2 * k
     return error
 
-def con(T, X):
-    cons = (
-        {'type': 'ineq', 'fun': lambda x: x[0]},
-        {'type': 'ineq', 'fun': lambda x: x[1]},
-        {'type': 'ineq', 'fun': lambda x: 0.5 - x[0] - x[1]}
-    )
-    return cons
+# def con_ineq1(args):
+#     a0, a3, a4, a5, t1, t_st = args[:6]
+#     return A_t(t1, args)
 
 if __name__ == '__main__':
-    # dirs = os.listdir('./data')
-    # for dir in dirs:
-    #     print(dir)
-    #     load_path = 'data/' + dir + '/'
-    #     check_location(load_path)
-    # exit()
-
     if len(sys.argv) != 2:
         print('[Usage] python check.py userName-taskId')
         exit()
